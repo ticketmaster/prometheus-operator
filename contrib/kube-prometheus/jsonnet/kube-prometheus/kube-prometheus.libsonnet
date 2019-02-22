@@ -41,6 +41,7 @@ local configMapList = k.core.v1.configMapList;
 } + {
   _config+:: {
     namespace: 'default',
+    package: 'kube-prometheus',
 
     versions+:: {
       grafana: '6.0.0-beta1',

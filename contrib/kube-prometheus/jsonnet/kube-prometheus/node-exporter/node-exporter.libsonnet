@@ -3,6 +3,7 @@ local k = import 'ksonnet/ksonnet.beta.3/k.libsonnet';
 {
   _config+:: {
     namespace: 'default',
+    package: 'kube-prometheus',
 
     versions+:: {
       nodeExporter: 'v0.17.0',
@@ -19,6 +20,7 @@ local k = import 'ksonnet/ksonnet.beta.3/k.libsonnet';
       labels: {
         'apps.kubernetes.io/name': $._config.nodeExporter.name,
         'apps.kubernetes.io/component': $._config.nodeExporter.name,
+        'apps.kubernetes.io/part-of': $._config.package,
         'apps.kubernetes.io/version': $._config.versions.nodeExporter,
       },
       port: 9100,

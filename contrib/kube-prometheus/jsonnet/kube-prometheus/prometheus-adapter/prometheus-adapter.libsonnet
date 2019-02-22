@@ -3,6 +3,7 @@ local k = import 'ksonnet/ksonnet.beta.3/k.libsonnet';
 {
   _config+:: {
     namespace: 'default',
+    package: 'kube-prometheus',
 
     versions+:: {
       prometheusAdapter: 'v0.4.1',
@@ -17,6 +18,7 @@ local k = import 'ksonnet/ksonnet.beta.3/k.libsonnet';
       labels: {
         'apps.kubernetes.io/name': $._config.prometheusAdapter.name,
         'apps.kubernetes.io/component': $._config.prometheusAdapter.name,
+        'apps.kubernetes.io/part-of': $._config.package,
         'apps.kubernetes.io/version': $._config.versions.prometheusAdapter,
       },
       prometheusURL: 'http://prometheus-' + $._config.prometheus.name + '.' + $._config.namespace + '.svc:9090/',

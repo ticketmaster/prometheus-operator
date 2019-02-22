@@ -3,12 +3,14 @@ local k = import 'ksonnet/ksonnet.beta.3/k.libsonnet';
 {
   _config+:: {
     namespace: 'default',
+    package: 'kube-prometheus',
 
     kubeStateMetrics+:: {
       name: 'kube-state-metrics',
       labels: {
         'apps.kubernetes.io/name': $._config.kubeStateMetrics.name,
         'apps.kubernetes.io/component': $._config.kubeStateMetrics.name,
+        'apps.kubernetes.io/part-of': $._config.package,
         'apps.kubernetes.io/version': $._config.versions.kubeStateMetrics,
       },
       collectors: '',  // empty string gets a default set
