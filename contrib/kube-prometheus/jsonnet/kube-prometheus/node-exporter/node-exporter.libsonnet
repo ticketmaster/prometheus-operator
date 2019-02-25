@@ -17,12 +17,14 @@ local k = import 'ksonnet/ksonnet.beta.3/k.libsonnet';
 
     nodeExporter+:: {
       name: 'node-exporter',
-      labels: {
+      daemonsetSelectorLabels: {
         'apps.kubernetes.io/name': $._config.nodeExporter.name,
         'apps.kubernetes.io/component': $._config.nodeExporter.name,
         'apps.kubernetes.io/part-of': $._config.package,
-        'apps.kubernetes.io/version': $._config.versions.nodeExporter,
       },
+      commonLabels:
+        $._config.nodeExporter.daemonsetSelectorLabels +
+        { 'apps.kubernetes.io/version': $._config.versions.nodeExporter },
       port: 9100,
     },
   },
@@ -32,7 +34,7 @@ local k = import 'ksonnet/ksonnet.beta.3/k.libsonnet';
       local clusterRoleBinding = k.rbac.v1.clusterRoleBinding;
 
       clusterRoleBinding.new() +
-      clusterRoleBinding.mixin.metadata.withLabels($._config.nodeExporter.labels) +
+      clusterRoleBinding.mixin.metadata.withLabels($._config.nodeExporter.commonLabels) +
       clusterRoleBinding.mixin.metadata.withName($._config.nodeExporter.name) +
       clusterRoleBinding.mixin.roleRef.withApiGroup('rbac.authorization.k8s.io') +
       clusterRoleBinding.mixin.roleRef.withName($.nodeExporter.clusterRole.metadata.name) +
@@ -64,7 +66,7 @@ local k = import 'ksonnet/ksonnet.beta.3/k.libsonnet';
       local rules = [authenticationRole, authorizationRole];
 
       clusterRole.new() +
-      clusterRole.mixin.metadata.withLabels($._config.nodeExporter.labels) +
+      clusterRole.mixin.metadata.withLabels($._config.nodeExporter.commonLabels) +
       clusterRole.mixin.metadata.withName($._config.nodeExporter.name) +
       clusterRole.withRules(rules),
 
@@ -77,8 +79,6 @@ local k = import 'ksonnet/ksonnet.beta.3/k.libsonnet';
       local podSelector = daemonset.mixin.spec.template.spec.selectorType;
       local toleration = daemonset.mixin.spec.template.spec.tolerationsType;
       local containerEnv = container.envType;
-
-      local podLabels = { app: 'node-exporter' };
 
       local noExecuteToleration = toleration.new() +
                                   toleration.withOperator('Exists') +
@@ -147,9 +147,9 @@ local k = import 'ksonnet/ksonnet.beta.3/k.libsonnet';
       daemonset.new() +
       daemonset.mixin.metadata.withName($._config.nodeExporter.name) +
       daemonset.mixin.metadata.withNamespace($._config.namespace) +
-      daemonset.mixin.metadata.withLabels(podLabels) +
-      daemonset.mixin.spec.selector.withMatchLabels(podLabels) +
-      daemonset.mixin.spec.template.metadata.withLabels(podLabels) +
+      daemonset.mixin.metadata.withLabels($._config.nodeExporter.commonLabels) +
+      daemonset.mixin.spec.selector.withMatchLabels($._config.nodeExporter.daemonsetSelectorLabels) +
+      daemonset.mixin.spec.template.metadata.withLabels($._config.nodeExporter.commonLabels) +
       daemonset.mixin.spec.template.spec.withTolerations([noExecuteToleration, noScheduleToleration]) +
       daemonset.mixin.spec.template.spec.withNodeSelector({ 'beta.kubernetes.io/os': 'linux' }) +
       daemonset.mixin.spec.template.spec.withContainers(c) +
@@ -164,7 +164,7 @@ local k = import 'ksonnet/ksonnet.beta.3/k.libsonnet';
       local serviceAccount = k.core.v1.serviceAccount;
 
       serviceAccount.new($._config.nodeExporter.name) +
-      serviceAccount.mixin.metadata.withLabels($._config.nodeExporter.labels) +
+      serviceAccount.mixin.metadata.withLabels($._config.nodeExporter.commonLabels) +
       serviceAccount.mixin.metadata.withNamespace($._config.namespace),
 
     serviceMonitor:
@@ -174,11 +174,11 @@ local k = import 'ksonnet/ksonnet.beta.3/k.libsonnet';
         metadata: {
           name: $._config.nodeExporter.name,
           namespace: $._config.namespace,
-          labels: $._config.nodeExporter.labels,
+          labels: $._config.nodeExporter.commonLabels,
         },
         spec: {
           selector: {
-            matchLabels: $.nodeExporter.service.metadata.labels,
+            matchLabels: $.nodeExporter.service.metadata.commonLabels,
           },
           endpoints: [
             {
@@ -202,7 +202,7 @@ local k = import 'ksonnet/ksonnet.beta.3/k.libsonnet';
 
       service.new($._config.nodeExporter.name, $.nodeExporter.daemonset.spec.selector.matchLabels, nodeExporterPort) +
       service.mixin.metadata.withNamespace($._config.namespace) +
-      service.mixin.metadata.withLabels($._config.nodeExporter.labels) +
+      service.mixin.metadata.withLabels($._config.nodeExporter.commonLabels) +
       service.mixin.spec.withClusterIp('None'),
   },
 }
