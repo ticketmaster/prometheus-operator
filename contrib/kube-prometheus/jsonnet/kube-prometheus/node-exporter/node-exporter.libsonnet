@@ -15,6 +15,7 @@ local k = import 'ksonnet/ksonnet.beta.3/k.libsonnet';
     },
 
     nodeExporter+:: {
+      labels: { 'apps.kubernetes.io/name': 'node-exporter' },
       port: 9100,
     },
   },
@@ -24,6 +25,7 @@ local k = import 'ksonnet/ksonnet.beta.3/k.libsonnet';
       local clusterRoleBinding = k.rbac.v1.clusterRoleBinding;
 
       clusterRoleBinding.new() +
+      clusterRoleBinding.mixin.metadata.withLabels($._config.nodeExporter.labels) +
       clusterRoleBinding.mixin.metadata.withName('node-exporter') +
       clusterRoleBinding.mixin.roleRef.withApiGroup('rbac.authorization.k8s.io') +
       clusterRoleBinding.mixin.roleRef.withName('node-exporter') +
@@ -51,6 +53,7 @@ local k = import 'ksonnet/ksonnet.beta.3/k.libsonnet';
       local rules = [authenticationRole, authorizationRole];
 
       clusterRole.new() +
+      clusterRole.mixin.metadata.withLabels($._config.nodeExporter.labels) +
       clusterRole.mixin.metadata.withName('node-exporter') +
       clusterRole.withRules(rules),
 
@@ -150,6 +153,7 @@ local k = import 'ksonnet/ksonnet.beta.3/k.libsonnet';
       local serviceAccount = k.core.v1.serviceAccount;
 
       serviceAccount.new('node-exporter') +
+      serviceAccount.mixin.metadata.withLabels($._config.nodeExporter.labels) +
       serviceAccount.mixin.metadata.withNamespace($._config.namespace),
 
     serviceMonitor:
@@ -159,16 +163,11 @@ local k = import 'ksonnet/ksonnet.beta.3/k.libsonnet';
         metadata: {
           name: 'node-exporter',
           namespace: $._config.namespace,
-          labels: {
-            'k8s-app': 'node-exporter',
-          },
+          labels: $._config.nodeExporter.labels,
         },
         spec: {
-          jobLabel: 'k8s-app',
           selector: {
-            matchLabels: {
-              'k8s-app': 'node-exporter',
-            },
+            matchLabels: $._config.nodeExporter.labels,
           },
           endpoints: [
             {
@@ -192,7 +191,7 @@ local k = import 'ksonnet/ksonnet.beta.3/k.libsonnet';
 
       service.new('node-exporter', $.nodeExporter.daemonset.spec.selector.matchLabels, nodeExporterPort) +
       service.mixin.metadata.withNamespace($._config.namespace) +
-      service.mixin.metadata.withLabels({ 'k8s-app': 'node-exporter' }) +
+      service.mixin.metadata.withLabels($._config.nodeExporter.labels) +
       service.mixin.spec.withClusterIp('None'),
   },
 }
