@@ -302,7 +302,7 @@ local k = import 'ksonnet/ksonnet.beta.3/k.libsonnet';
         },
         spec: {
           selector: {
-            matchLabels: $.kubeStateMetrics.service.metadata.commonLabels,
+            matchLabels: $.kubeStateMetrics.service.metadata.labels,
           },
           endpoints: [
             {

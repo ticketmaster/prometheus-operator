@@ -178,7 +178,7 @@ local k = import 'ksonnet/ksonnet.beta.3/k.libsonnet';
         },
         spec: {
           selector: {
-            matchLabels: $.nodeExporter.service.metadata.commonLabels,
+            matchLabels: $.nodeExporter.service.metadata.labels,
           },
           endpoints: [
             {
