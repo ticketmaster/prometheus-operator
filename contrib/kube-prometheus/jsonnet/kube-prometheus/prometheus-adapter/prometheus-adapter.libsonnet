@@ -15,12 +15,14 @@ local k = import 'ksonnet/ksonnet.beta.3/k.libsonnet';
 
     prometheusAdapter+:: {
       name: 'prometheus-adapter',
-      labels: {
+      deploymentSelectorLabels: {
         'apps.kubernetes.io/name': $._config.prometheusAdapter.name,
         'apps.kubernetes.io/component': $._config.prometheusAdapter.name,
         'apps.kubernetes.io/part-of': $._config.package,
-        'apps.kubernetes.io/version': $._config.versions.prometheusAdapter,
       },
+      commonLabels:
+        $._config.prometheusAdapter.deploymentSelectorLabels +
+        { 'apps.kubernetes.io/version': $._config.versions.prometheusAdapter },
       prometheusURL: 'http://prometheus-' + $._config.prometheus.name + '.' + $._config.namespace + '.svc:9090/',
       config: |||
         resourceRules:
@@ -59,7 +61,7 @@ local k = import 'ksonnet/ksonnet.beta.3/k.libsonnet';
         apiVersion: 'apiregistration.k8s.io/v1',
         kind: 'APIService',
         metadata: {
-          labels: $._config.prometheusAdapter.labels,
+          labels: $._config.prometheusAdapter.commonLabels,
           name: 'v1beta1.metrics.k8s.io',
         },
         spec: {
@@ -79,7 +81,7 @@ local k = import 'ksonnet/ksonnet.beta.3/k.libsonnet';
       local configmap = k.core.v1.configMap;
 
       configmap.new('adapter-config', { 'config.yaml': $._config.prometheusAdapter.config }) +
-      configmap.mixin.metadata.withLabels($._config.prometheusAdapter.labels) +
+      configmap.mixin.metadata.withLabels($._config.prometheusAdapter.commonLabels) +
       configmap.mixin.metadata.withNamespace($._config.namespace),
 
     service:
@@ -88,11 +90,11 @@ local k = import 'ksonnet/ksonnet.beta.3/k.libsonnet';
 
       service.new(
         $._config.prometheusAdapter.name,
-        $._config.prometheusAdapter.labels,
+        $.prometheusAdapter.deployment.spec.selector.matchLabels,
         servicePort.newNamed('https', 443, 6443),
       ) +
       service.mixin.metadata.withNamespace($._config.namespace) +
-      service.mixin.metadata.withLabels($._config.prometheusAdapter.labels),
+      service.mixin.metadata.withLabels($._config.prometheusAdapter.commonLabels),
 
     deployment:
       local deployment = k.apps.v1beta2.deployment;
@@ -117,9 +119,9 @@ local k = import 'ksonnet/ksonnet.beta.3/k.libsonnet';
           containerVolumeMount.new('config', '/etc/adapter'),
         ],);
 
-      deployment.new($._config.prometheusAdapter.name, 1, c, $._config.prometheusAdapter.labels) +
+      deployment.new($._config.prometheusAdapter.name, 1, c, $._config.prometheusAdapter.commonLabels) +
       deployment.mixin.metadata.withNamespace($._config.namespace) +
-      deployment.mixin.spec.selector.withMatchLabels($._config.prometheusAdapter.labels) +
+      deployment.mixin.spec.selector.withMatchLabels($._config.prometheusAdapter.deploymentSelectorLabels) +
       deployment.mixin.spec.template.spec.withServiceAccountName($.prometheusAdapter.serviceAccount.metadata.name) +
       deployment.mixin.spec.template.spec.withNodeSelector({ 'beta.kubernetes.io/os': 'linux' }) +
       deployment.mixin.spec.strategy.rollingUpdate.withMaxSurge(1) +
@@ -134,7 +136,7 @@ local k = import 'ksonnet/ksonnet.beta.3/k.libsonnet';
       local serviceAccount = k.core.v1.serviceAccount;
 
       serviceAccount.new($._config.prometheusAdapter.name) +
-      serviceAccount.mixin.metadata.withLabels($._config.prometheusAdapter.labels) +
+      serviceAccount.mixin.metadata.withLabels($._config.prometheusAdapter.commonLabels) +
       serviceAccount.mixin.metadata.withNamespace($._config.namespace),
 
     clusterRole:
@@ -148,7 +150,7 @@ local k = import 'ksonnet/ksonnet.beta.3/k.libsonnet';
         policyRule.withVerbs(['get', 'list', 'watch']);
 
       clusterRole.new() +
-      clusterRole.mixin.metadata.withLabels($._config.prometheusAdapter.labels) +
+      clusterRole.mixin.metadata.withLabels($._config.prometheusAdapter.commonLabels) +
       clusterRole.mixin.metadata.withName($._config.prometheusAdapter.name) +
       clusterRole.withRules(rules),
 
@@ -156,7 +158,7 @@ local k = import 'ksonnet/ksonnet.beta.3/k.libsonnet';
       local clusterRoleBinding = k.rbac.v1.clusterRoleBinding;
 
       clusterRoleBinding.new() +
-      clusterRoleBinding.mixin.metadata.withLabels($._config.prometheusAdapter.labels) +
+      clusterRoleBinding.mixin.metadata.withLabels($._config.prometheusAdapter.commonLabels) +
       clusterRoleBinding.mixin.metadata.withName($._config.prometheusAdapter.name) +
       clusterRoleBinding.mixin.roleRef.withApiGroup('rbac.authorization.k8s.io') +
       clusterRoleBinding.mixin.roleRef.withName($.prometheusAdapter.clusterRole.metadata.name) +
@@ -171,7 +173,7 @@ local k = import 'ksonnet/ksonnet.beta.3/k.libsonnet';
       local clusterRoleBinding = k.rbac.v1.clusterRoleBinding;
 
       clusterRoleBinding.new() +
-      clusterRoleBinding.mixin.metadata.withLabels($._config.prometheusAdapter.labels) +
+      clusterRoleBinding.mixin.metadata.withLabels($._config.prometheusAdapter.commonLabels) +
       clusterRoleBinding.mixin.metadata.withName('resource-metrics:system:auth-delegator') +
       clusterRoleBinding.mixin.roleRef.withApiGroup('rbac.authorization.k8s.io') +
       clusterRoleBinding.mixin.roleRef.withName('system:auth-delegator') +
@@ -193,7 +195,7 @@ local k = import 'ksonnet/ksonnet.beta.3/k.libsonnet';
         policyRule.withVerbs(['*']);
 
       clusterRole.new() +
-      clusterRole.mixin.metadata.withLabels($._config.prometheusAdapter.labels) +
+      clusterRole.mixin.metadata.withLabels($._config.prometheusAdapter.commonLabels) +
       clusterRole.mixin.metadata.withName('resource-metrics-server-resources') +
       clusterRole.withRules(rules),
 
@@ -201,7 +203,7 @@ local k = import 'ksonnet/ksonnet.beta.3/k.libsonnet';
       local roleBinding = k.rbac.v1.roleBinding;
 
       roleBinding.new() +
-      roleBinding.mixin.metadata.withLabels($._config.prometheusAdapter.labels) +
+      roleBinding.mixin.metadata.withLabels($._config.prometheusAdapter.commonLabels) +
       roleBinding.mixin.metadata.withName('resource-metrics-auth-reader') +
       roleBinding.mixin.metadata.withNamespace('kube-system') +
       roleBinding.mixin.roleRef.withApiGroup('rbac.authorization.k8s.io') +
