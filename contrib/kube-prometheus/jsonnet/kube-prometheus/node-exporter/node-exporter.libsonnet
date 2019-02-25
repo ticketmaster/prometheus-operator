@@ -15,7 +15,12 @@ local k = import 'ksonnet/ksonnet.beta.3/k.libsonnet';
     },
 
     nodeExporter+:: {
-      labels: { 'apps.kubernetes.io/name': 'node-exporter' },
+      name: 'node-exporter',
+      labels: {
+        'apps.kubernetes.io/name': $._config.nodeExporter.name,
+        'apps.kubernetes.io/component': $._config.nodeExporter.name,
+        'apps.kubernetes.io/version': $._config.versions.nodeExporter,
+      },
       port: 9100,
     },
   },
@@ -26,11 +31,15 @@ local k = import 'ksonnet/ksonnet.beta.3/k.libsonnet';
 
       clusterRoleBinding.new() +
       clusterRoleBinding.mixin.metadata.withLabels($._config.nodeExporter.labels) +
-      clusterRoleBinding.mixin.metadata.withName('node-exporter') +
+      clusterRoleBinding.mixin.metadata.withName($._config.nodeExporter.name) +
       clusterRoleBinding.mixin.roleRef.withApiGroup('rbac.authorization.k8s.io') +
-      clusterRoleBinding.mixin.roleRef.withName('node-exporter') +
+      clusterRoleBinding.mixin.roleRef.withName($.nodeExporter.clusterRole.metadata.name) +
       clusterRoleBinding.mixin.roleRef.mixinInstance({ kind: 'ClusterRole' }) +
-      clusterRoleBinding.withSubjects([{ kind: 'ServiceAccount', name: 'node-exporter', namespace: $._config.namespace }]),
+      clusterRoleBinding.withSubjects([{
+        kind: 'ServiceAccount',
+        name: $.nodeExporter.serviceAccount.metadata.name,
+        namespace: $._config.namespace,
+      }]),
 
     clusterRole:
       local clusterRole = k.rbac.v1.clusterRole;
@@ -54,7 +63,7 @@ local k = import 'ksonnet/ksonnet.beta.3/k.libsonnet';
 
       clusterRole.new() +
       clusterRole.mixin.metadata.withLabels($._config.nodeExporter.labels) +
-      clusterRole.mixin.metadata.withName('node-exporter') +
+      clusterRole.mixin.metadata.withName($._config.nodeExporter.name) +
       clusterRole.withRules(rules),
 
     daemonset:
@@ -134,7 +143,7 @@ local k = import 'ksonnet/ksonnet.beta.3/k.libsonnet';
       local c = [nodeExporter, proxy];
 
       daemonset.new() +
-      daemonset.mixin.metadata.withName('node-exporter') +
+      daemonset.mixin.metadata.withName($._config.nodeExporter.name) +
       daemonset.mixin.metadata.withNamespace($._config.namespace) +
       daemonset.mixin.metadata.withLabels(podLabels) +
       daemonset.mixin.spec.selector.withMatchLabels(podLabels) +
@@ -145,14 +154,14 @@ local k = import 'ksonnet/ksonnet.beta.3/k.libsonnet';
       daemonset.mixin.spec.template.spec.withVolumes([procVolume, sysVolume, rootVolume]) +
       daemonset.mixin.spec.template.spec.securityContext.withRunAsNonRoot(true) +
       daemonset.mixin.spec.template.spec.securityContext.withRunAsUser(65534) +
-      daemonset.mixin.spec.template.spec.withServiceAccountName('node-exporter') +
+      daemonset.mixin.spec.template.spec.withServiceAccountName($.nodeExporter.serviceAccount.metadata.name) +
       daemonset.mixin.spec.template.spec.withHostPid(true) +
       daemonset.mixin.spec.template.spec.withHostNetwork(true),
 
     serviceAccount:
       local serviceAccount = k.core.v1.serviceAccount;
 
-      serviceAccount.new('node-exporter') +
+      serviceAccount.new($._config.nodeExporter.name) +
       serviceAccount.mixin.metadata.withLabels($._config.nodeExporter.labels) +
       serviceAccount.mixin.metadata.withNamespace($._config.namespace),
 
@@ -161,13 +170,13 @@ local k = import 'ksonnet/ksonnet.beta.3/k.libsonnet';
         apiVersion: 'monitoring.coreos.com/v1',
         kind: 'ServiceMonitor',
         metadata: {
-          name: 'node-exporter',
+          name: $._config.nodeExporter.name,
           namespace: $._config.namespace,
           labels: $._config.nodeExporter.labels,
         },
         spec: {
           selector: {
-            matchLabels: $._config.nodeExporter.labels,
+            matchLabels: $.nodeExporter.service.metadata.labels,
           },
           endpoints: [
             {
@@ -189,7 +198,7 @@ local k = import 'ksonnet/ksonnet.beta.3/k.libsonnet';
 
       local nodeExporterPort = servicePort.newNamed('https', $._config.nodeExporter.port, 'https');
 
-      service.new('node-exporter', $.nodeExporter.daemonset.spec.selector.matchLabels, nodeExporterPort) +
+      service.new($._config.nodeExporter.name, $.nodeExporter.daemonset.spec.selector.matchLabels, nodeExporterPort) +
       service.mixin.metadata.withNamespace($._config.namespace) +
       service.mixin.metadata.withLabels($._config.nodeExporter.labels) +
       service.mixin.spec.withClusterIp('None'),
