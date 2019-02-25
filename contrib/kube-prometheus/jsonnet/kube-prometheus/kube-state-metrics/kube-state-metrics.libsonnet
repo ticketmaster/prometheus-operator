@@ -7,12 +7,15 @@ local k = import 'ksonnet/ksonnet.beta.3/k.libsonnet';
 
     kubeStateMetrics+:: {
       name: 'kube-state-metrics',
-      labels: {
+      deploymentSelectorLabels: {
         'apps.kubernetes.io/name': $._config.kubeStateMetrics.name,
         'apps.kubernetes.io/component': $._config.kubeStateMetrics.name,
         'apps.kubernetes.io/part-of': $._config.package,
-        'apps.kubernetes.io/version': $._config.versions.kubeStateMetrics,
       },
+      commonLabels:
+        $._config.kubeStateMetrics.deploymentSelectorLabels +
+        { 'apps.kubernetes.io/version': $._config.versions.kubeStateMetrics },
+
       collectors: '',  // empty string gets a default set
       scrapeInterval: '30s',
       scrapeTimeout: '30s',
@@ -41,7 +44,7 @@ local k = import 'ksonnet/ksonnet.beta.3/k.libsonnet';
       local clusterRoleBinding = k.rbac.v1.clusterRoleBinding;
 
       clusterRoleBinding.new() +
-      clusterRoleBinding.mixin.metadata.withLabels($._config.kubeStateMetrics.labels) +
+      clusterRoleBinding.mixin.metadata.withLabels($._config.kubeStateMetrics.commonLabels) +
       clusterRoleBinding.mixin.metadata.withName($._config.kubeStateMetrics.name) +
       clusterRoleBinding.mixin.roleRef.withApiGroup('rbac.authorization.k8s.io') +
       clusterRoleBinding.mixin.roleRef.withName($.kubeStateMetrics.clusterRole.metadata.name) +
@@ -132,7 +135,7 @@ local k = import 'ksonnet/ksonnet.beta.3/k.libsonnet';
       local rules = [coreRule, extensionsRule, appsRule, batchRule, autoscalingRule, authenticationRole, authorizationRole, policyRule];
 
       clusterRole.new() +
-      clusterRole.mixin.metadata.withLabels($._config.kubeStateMetrics.labels) +
+      clusterRole.mixin.metadata.withLabels($._config.kubeStateMetrics.commonLabels) +
       clusterRole.mixin.metadata.withName($._config.kubeStateMetrics.name) +
       clusterRole.withRules(rules),
 
@@ -210,10 +213,10 @@ local k = import 'ksonnet/ksonnet.beta.3/k.libsonnet';
 
       local c = [proxyClusterMetrics, proxySelfMetrics, kubeStateMetrics, addonResizer];
 
-      deployment.new($._config.kubeStateMetrics.name, 1, c, $._config.kubeStateMetrics.labels) +
+      deployment.new($._config.kubeStateMetrics.name, 1, c, $._config.kubeStateMetrics.commonLabels) +
       deployment.mixin.metadata.withNamespace($._config.namespace) +
-      deployment.mixin.metadata.withLabels($._config.kubeStateMetrics.labels) +
-      deployment.mixin.spec.selector.withMatchLabels($._config.kubeStateMetrics.labels) +
+      deployment.mixin.metadata.withLabels($._config.kubeStateMetrics.commonLabels) +
+      deployment.mixin.spec.selector.withMatchLabels($._config.kubeStateMetrics.deploymentSelectorLabels) +
       deployment.mixin.spec.template.spec.withNodeSelector({ 'beta.kubernetes.io/os': 'linux' }) +
       deployment.mixin.spec.template.spec.securityContext.withRunAsNonRoot(true) +
       deployment.mixin.spec.template.spec.securityContext.withRunAsUser(65534) +
@@ -223,7 +226,7 @@ local k = import 'ksonnet/ksonnet.beta.3/k.libsonnet';
       local roleBinding = k.rbac.v1.roleBinding;
 
       roleBinding.new() +
-      roleBinding.mixin.metadata.withLabels($._config.kubeStateMetrics.labels) +
+      roleBinding.mixin.metadata.withLabels($._config.kubeStateMetrics.commonLabels) +
       roleBinding.mixin.metadata.withName($._config.kubeStateMetrics.name) +
       roleBinding.mixin.metadata.withNamespace($._config.namespace) +
       roleBinding.mixin.roleRef.withApiGroup('rbac.authorization.k8s.io') +
@@ -264,7 +267,7 @@ local k = import 'ksonnet/ksonnet.beta.3/k.libsonnet';
       local rules = [coreRule, extensionsRule, appsRule];
 
       role.new() +
-      role.mixin.metadata.withLabels($._config.kubeStateMetrics.labels) +
+      role.mixin.metadata.withLabels($._config.kubeStateMetrics.commonLabels) +
       role.mixin.metadata.withName($._config.kubeStateMetrics.name) +
       role.mixin.metadata.withNamespace($._config.namespace) +
       role.withRules(rules),
@@ -273,7 +276,7 @@ local k = import 'ksonnet/ksonnet.beta.3/k.libsonnet';
       local serviceAccount = k.core.v1.serviceAccount;
 
       serviceAccount.new($._config.kubeStateMetrics.name) +
-      serviceAccount.mixin.metadata.withLabels($._config.kubeStateMetrics.labels) +
+      serviceAccount.mixin.metadata.withLabels($._config.kubeStateMetrics.commonLabels) +
       serviceAccount.mixin.metadata.withNamespace($._config.namespace),
 
     service:
@@ -285,7 +288,7 @@ local k = import 'ksonnet/ksonnet.beta.3/k.libsonnet';
 
       service.new($._config.kubeStateMetrics.name, $.kubeStateMetrics.deployment.spec.selector.matchLabels, [ksmServicePortMain, ksmServicePortSelf]) +
       service.mixin.metadata.withNamespace($._config.namespace) +
-      service.mixin.metadata.withLabels($._config.kubeStateMetrics.labels) +
+      service.mixin.metadata.withLabels($._config.kubeStateMetrics.commonLabels) +
       service.mixin.spec.withClusterIp('None'),
 
     serviceMonitor:
@@ -295,11 +298,11 @@ local k = import 'ksonnet/ksonnet.beta.3/k.libsonnet';
         metadata: {
           name: $._config.kubeStateMetrics.name,
           namespace: $._config.namespace,
-          labels: $._config.kubeStateMetrics.labels,
+          labels: $._config.kubeStateMetrics.commonLabels,
         },
         spec: {
           selector: {
-            matchLabels: $.kubeStateMetrics.service.metadata.labels,
+            matchLabels: $.kubeStateMetrics.service.metadata.commonLabels,
           },
           endpoints: [
             {
